@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Calculadora Alliance One</title>
+<style>
+#calculadora {background:#fdf7f0;padding:20px;border:2px solid #1e3a5f;max-width:500px;font-family:Arial;color:#1e3a5f;border-radius:10px;}
+#calculadora h3 {color:#bfa046;}
+input,button{width:100%;margin:8px 0;padding:10px;}
+#resultado{background:#fff;padding:15px;border:1px solid #ccc;margin-top:15px;color:#000;}
+</style>
+</head>
+<body>
+
+<div id="calculadora">
+<h3>Calculadora Alliance One</h3>
+
+<label>Fecha de ingreso: <input type="date" id="fechaIngreso"></label>
+<label>Fecha de despido: <input type="date" id="fechaDespido"></label>
+<label>Mejor remuneración: <input type="number" id="sueldo"></label>
+<label>Años de antigüedad: <input type="number" id="antigManual"></label>
+<label>Pago a cuenta: <input type="number" id="pagoCuenta" value="0"></label>
+
+<button onclick="calcular()">Calcular</button>
+<div id="resultado"></div>
+</div>
+
+<script>
+function redondear(v){return (v%1>=0.5)?Math.ceil(v):Math.floor(v);}
+function formato(v){return "$ "+v.toLocaleString("es-AR")+" .-";}
+
+// SAC correcto (semestral)
+function calcularSAC(ingreso, despido, sueldo){
+  const mes = despido.getMonth();
+  let inicioSemestre;
+
+  if (mes <= 5){
+    inicioSemestre = new Date(despido.getFullYear(),0,1);
+  } else {
+    inicioSemestre = new Date(despido.getFullYear(),6,1);
+  }
+
+  const inicio = ingreso > inicioSemestre ? ingreso : inicioSemestre;
+  const dias = Math.floor((despido - inicio)/(1000*60*60*24)) + 1;
+
+  return redondear((sueldo/2)*(dias/182.5));
+}
+
+// conversor letras
+function numeroALetras(num){
+    const unidades = ["","UN","DOS","TRES","CUATRO","CINCO","SEIS","SIETE","OCHO","NUEVE"];
+    const decenas = ["","DIEZ","VEINTE","TREINTA","CUARENTA","CINCUENTA","SESENTA","SETENTA","OCHENTA","NOVENTA"];
+    const centenas = ["","CIENTO","DOSCIENTOS","TRESCIENTOS","CUATROCIENTOS","QUINIENTOS","SEISCIENTOS","SETECIENTOS","OCHOCIENTOS","NOVECIENTOS"];
+
+    function seccion(n){
+        let c = Math.floor(n/100);
+        let d = Math.floor((n%100)/10);
+        let u = n%10;
+
+        let texto = "";
+        if(n===100) return "CIEN";
+        if(c>0) texto += centenas[c]+" ";
+        if(d>0){
+            if(d===1 && u>0){
+                const especiales=["ONCE","DOCE","TRECE","CATORCE","QUINCE"];
+                texto += especiales[u-1];
+                return texto;
+            }
+            texto += decenas[d];
+            if(u>0) texto += " Y "+unidades[u];
+        } else if(u>0){
+            texto += unidades[u];
+        }
+        return texto.trim();
+    }
+
+    let entero = Math.floor(num);
+    let centavos = Math.round((num - entero)*100);
+
+    let millones = Math.floor(entero/1000000);
+    let miles = Math.floor((entero%1000000)/1000);
+    let resto = entero%1000;
+
+    let texto = "";
+
+    if(millones>0){
+        texto += (millones===1?"UN MILLON":seccion(millones)+" MILLONES")+" ";
+    }
+    if(miles>0){
+        texto += (miles===1?"MIL":seccion(miles)+" MIL")+" ";
+    }
+    if(resto>0){
+        texto += seccion(resto)+" ";
+    }
+
+    texto = texto.trim();
+
+    if(centavos>0){
+        texto += " CON "+seccion(centavos)+" CENTAVOS";
+    }
+
+    return "SON PESOS: "+texto+".-";
+}
+
+function calcular(){
+
+const ingreso=new Date(document.getElementById('fechaIngreso').value);
+const despido=new Date(document.getElementById('fechaDespido').value+'T00:00:00');
+const sueldo=parseFloat(document.getElementById('sueldo').value);
+const antig=parseFloat(document.getElementById('antigManual').value);
+const pagoCuenta=parseFloat(document.getElementById('pagoCuenta').value)||0;
+
+if(isNaN(sueldo)||isNaN(antig)){alert("Completar datos");return;}
+
+const diasMes=new Date(despido.getFullYear(),despido.getMonth()+1,0).getDate();
+const diasTrab=despido.getDate();
+const diasTrabMes=redondear((sueldo/diasMes)*diasTrab);
+const integracion=diasTrabMes>=sueldo?0:redondear(sueldo-diasTrabMes);
+
+// SAC correcto
+const sac = calcularSAC(ingreso,despido,sueldo);
+
+// vacaciones proporcionales
+const inicioAnio=new Date(despido.getFullYear(),0,1);
+const inicioTrabajoAnio=ingreso>inicioAnio?ingreso:inicioAnio;
+const diasTrabajadosAnio=Math.floor((despido-inicioTrabajoAnio)/(1000*60*60*24))+1;
+
+let diasVac=antig<5?14:antig<10?21:antig<20?28:35;
+
+const vac=redondear(((sueldo/25)*diasVac/365)*diasTrabajadosAnio);
+const sacVac=redondear(vac/12);
+
+const antigInd=redondear(sueldo*antig);
+const preaviso=redondear(antig<5?sueldo:sueldo*2);
+const sacPre=redondear(preaviso/12);
+const sacInt=redondear(integracion/12);
+
+const art2=redondear(sueldo);
+
+const subtotal=preaviso+sacPre+integracion+sacInt+antigInd;
+const totalMenos=subtotal-pagoCuenta;
+
+const total=redondear(diasTrabMes+sac+vac+sacVac+totalMenos+art2);
+
+let html="";
+
+html+="<b>I.- DÍAS TRABAJADOS EN EL MES</b><br>........ "+formato(diasTrabMes)+"<br><br>";
+html+="<b>II.- SUELDO ANUAL COMPLEMENTARIO</b><br>........ "+formato(sac)+"<br><br>";
+html+="<b>III.- VACACIONES</b><br>........ "+formato(vac)+"<br><br>";
+html+="<b>IV.- S.A.C. VACACIONES PROP.</b><br>........ "+formato(sacVac)+"<br><br>";
+
+html+="<b>V.- INDEMNIZACIONES ARTS. 232, 233 Y 245</b><br><br>";
+
+html+="<b>INDEMNIZACIÓN POR FALTA DE PREAVISO</b><br>........ "+formato(preaviso)+"<br>";
+html+="<b>SAC S/ PREAVISO</b><br>........ "+formato(sacPre)+"<br>";
+html+="<b>INDEMNIZACIÓN INTEGRACIÓN MES DESPIDO</b><br>........ "+formato(integracion)+"<br>";
+html+="<b>SAC S/ INTEGRACIÓN</b><br>........ "+formato(sacInt)+"<br>";
+html+="<b>INDEMNIZACIÓN POR ANTIGÜEDAD</b><br>........ "+formato(antigInd)+"<br><br>";
+
+html+="<b>SUBTOTAL</b> ........ "+formato(subtotal)+"<br>";
+html+="<b>MENOS PAGO CUENTA</b> ........ "+formato(pagoCuenta)+"<br>";
+html+="<b>TOTAL</b> ........ "+formato(totalMenos)+"<br><br>";
+
+html+="<b>VI.- ART 2 LEY 25.323</b><br>........ "+formato(art2)+"<br><br>";
+
+html+="<b>TOTAL PLANILLA</b><br>........ "+formato(total)+"<br>";
+html+= numeroALetras(total);
+
+document.getElementById('resultado').innerHTML=html;
+}
+</script>
+
+</body>
+</html>
