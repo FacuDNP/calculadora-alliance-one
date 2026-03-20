@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Calculadora Alliance One</title>
+<style>
+#calculadora {background:#fdf7f0;padding:20px;border:2px solid #1e3a5f;max-width:500px;font-family:Arial;color:#1e3a5f;border-radius:10px;}
+#calculadora h3 {color:#bfa046;}
+input,button{width:100%;margin:8px 0;padding:10px;}
+#resultado{background:#fff;padding:15px;border:1px solid #ccc;margin-top:15px;color:#000;}
+</style>
+</head>
+<body>
+
+<div id="calculadora">
+<h3>Calculadora Alliance One</h3>
+
+<label>Fecha de ingreso: <input type="date" id="fechaIngreso"></label>
+<label>Fecha de despido: <input type="date" id="fechaDespido"></label>
+<label>Mejor remuneración: <input type="number" id="sueldo"></label>
+<label>Años de antigüedad: <input type="number" id="antigManual"></label>
+<label>Pago a cuenta: <input type="number" id="pagoCuenta" value="0"></label>
+
+<button onclick="calcular()">Calcular</button>
+<div id="resultado"></div>
+</div>
+
+<script>
+function redondear(v){return (v%1>=0.5)?Math.ceil(v):Math.floor(v);}
+function formato(v){return "$ "+v.toLocaleString("es-AR")+" .-";}
+
+function lineaDetalle(texto, valor){
+  const totalLength = 90;
+  const monto = formato(valor);
+  const base = texto + " ";
+  const puntos = ".".repeat(Math.max(5, totalLength - base.length - monto.length));
+  return "<div>"+ base + puntos + monto + "</div>";
+}
+
+function calcularSAC(ingreso, despido, sueldo){
+  const mes = despido.getMonth();
+  let inicioSemestre = mes <= 5 ? new Date(despido.getFullYear(),0,1) : new Date(despido.getFullYear(),6,1);
+  const inicio = ingreso > inicioSemestre ? ingreso : inicioSemestre;
+  const dias = Math.floor((despido - inicio)/(1000*60*60*24)) + 1;
+  return redondear((sueldo/2)*(dias/182.5));
+}
+
+function numeroALetras(num){
+  return num.toLocaleString("es-AR");
+}
+
+function calcular(){
+
+const ingreso=new Date(document.getElementById('fechaIngreso').value);
+const despido=new Date(document.getElementById('fechaDespido').value+'T00:00:00');
+const sueldo=parseFloat(document.getElementById('sueldo').value);
+const antig=parseFloat(document.getElementById('antigManual').value);
+const pagoCuenta=parseFloat(document.getElementById('pagoCuenta').value)||0;
+
+if(isNaN(sueldo)||isNaN(antig)){alert("Completar datos");return;}
+
+const diasMes=new Date(despido.getFullYear(),despido.getMonth()+1,0).getDate();
+const diasTrab=despido.getDate();
+const diasTrabMes=redondear((sueldo/diasMes)*diasTrab);
+const integracion=diasTrabMes>=sueldo?0:redondear(sueldo-diasTrabMes);
+
+const sac = calcularSAC(ingreso,despido,sueldo);
+
+const inicioAnio=new Date(despido.getFullYear(),0,1);
+const inicioTrabajoAnio=ingreso>inicioAnio?ingreso:inicioAnio;
+const diasTrabajadosAnio=Math.floor((despido-inicioTrabajoAnio)/(1000*60*60*24))+1;
+
+let diasVac=antig<5?14:antig<10?21:antig<20?28:35;
+
+const vac=redondear(((sueldo/25)*diasVac/365)*diasTrabajadosAnio);
+const sacVac=redondear(vac/12);
+
+const antigInd=redondear(sueldo*antig);
+const preaviso=redondear(antig<5?sueldo:sueldo*2);
+const sacPre=redondear(preaviso/12);
+const sacInt=redondear(integracion/12);
+
+const art2=redondear(sueldo);
+
+const subtotal=preaviso+sacPre+integracion+sacInt+antigInd;
+const totalMenos=subtotal-pagoCuenta;
+
+const total=redondear(diasTrabMes+sac+vac+sacVac+totalMenos+art2);
+
+let html="";
+
+const mesNombre = despido.toLocaleString("es-AR", { month: "short" });
+const anio = despido.getFullYear();
+
+html += "<b>I.- DÍAS TRABAJADOS EN EL MES</b><br>";
+html += lineaDetalle(`${mesNombre}/${anio}`, diasTrabMes);
+html += "<br>";
+
+html += "<b>II.- SUELDO ANUAL COMPLEMENTARIO</b><br>";
+html += lineaDetalle(`Año ${anio} Prop.`, sac);
+html += "<br>";
+
+html += "<b>III.- VACACIONES PROPORCIONALES</b><br>";
+html += lineaDetalle(`Año ${anio} Prop.`, vac);
+html += "<br>";
+
+html += lineaDetalle("<b>IV.- S.A.C. VACACIONES PROP.</b>", sacVac);
+html += "<br>";
+
+html += "<b>V.- INDEMNIZACIONES ARTS. 232, 233 Y 245</b><br><br>";
+
+html += "<b>INDEMNIZACIÓN POR FALTA DE PREAVISO</b><br>";
+html += lineaDetalle("Art. 232 L.C.T.", preaviso);
+
+html += lineaDetalle("<b>SAC S/ PREAVISO</b>", sacPre);
+
+html += "<b>INDEMNIZACIÓN INTEGRACION MES DESPIDO</b><br>";
+html += lineaDetalle("Art. 233 L.C.T.", integracion);
+
+html += lineaDetalle("<b>SAC S/ INTEGRACION MES DESPIDO</b>", sacInt);
+
+html += "<b>INDEMNIZACION POR ANTIGÜEDAD</b><br>";
+html += lineaDetalle("Art. 245 L.C.T.", antigInd);
+
+html += "<br>";
+
+html += lineaDetalle("SUBTOTAL", subtotal);
+html += lineaDetalle("MENOS PAGO CUENTA BANCARIA", pagoCuenta);
+html += lineaDetalle("TOTAL", totalMenos);
+
+html += "<br>";
+
+html += "<b>VI.- ART 2 LEY 25.323</b><br>";
+html += lineaDetalle("Arts. 1737 a 1741 C.C.C.N.", art2);
+
+html += "<br>";
+
+html += lineaDetalle("TOTAL PLANILLA", total);
+html += "<br><b>SON PESOS: "+ numeroALetras(total) +".-</b>";
+
+document.getElementById('resultado').innerHTML=html;
+}
+</script>
+
+</body>
+</html>
